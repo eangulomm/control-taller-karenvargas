@@ -70,15 +70,12 @@ function jsonp(payload) {
   });
 }
 async function loginReal(data) {
-  const c = await jsonp({ action: "challenge", username: data.username }),
-    verifier = await sha(c.salt + data.password),
-    proof = await sha(verifier + c.nonce),
-    out = await jsonp({
-      action: "login",
-      username: data.username,
-      nonce: c.nonce,
-      proof,
-    });
+  const passwordHash = await sha(data.password);
+  const out = await jsonp({
+    action: "login",
+    username: data.username,
+    passwordHash,
+  });
   localStorage.tallerToken = out.token;
   return out.user;
 }
@@ -88,12 +85,7 @@ async function api(action, data = {}) {
     return demoApi(action, data);
   }
   if (action === "login") {
-    try {
-      return await loginReal(data);
-    } catch (e) {
-      if (!String(e.message).toLowerCase().includes("vencida")) throw e;
-      return loginReal(data);
-    }
+    return loginReal(data);
   }
   return jsonp({ action, token: localStorage.tallerToken, ...data });
 }
@@ -275,8 +267,9 @@ function enter(u) {
 }
 $("#loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const b = e.submitter;
+  const b = $("#loginForm button[type='submit']");
   b.disabled = true;
+  b.setAttribute("aria-busy", "true");
   b.textContent = "Ingresando…";
   $("#loginError").textContent = "";
   try {
@@ -290,6 +283,7 @@ $("#loginForm").addEventListener("submit", async (e) => {
     $("#loginError").textContent = x.message;
   } finally {
     b.disabled = false;
+    b.removeAttribute("aria-busy");
     b.textContent = "Iniciar sesión";
   }
 });

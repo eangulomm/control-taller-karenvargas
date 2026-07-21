@@ -6,7 +6,24 @@ const CFG = {
     audit: "Auditoria",
   },
   sessionHours: 720,
-  challengeMinutes: 5,
+};
+const USERS = {
+  karen: {
+    username: "karen",
+    passwordHash:
+      "93f2947d95ceabd3989ebd156b54c183e76ea006c4d93ad9557bead57701dfe5",
+    role: "admin",
+    name: "Karen",
+    active: true,
+  },
+  taller: {
+    username: "taller",
+    passwordHash:
+      "eaaedae85b40710496e7ba12793e2bd1323fcfd22b8ab04e6998dd7d78e04b4f",
+    role: "operador",
+    name: "Encargada del taller",
+    active: true,
+  },
 };
 const HEAD = {
   Trabajos: [
@@ -64,40 +81,12 @@ function reply_(obj, cb) {
   );
 }
 
-// Ejecutar una sola vez desde el editor. Después cambiar ambas contraseñas.
+// Opcional: crea las pestañas si la hoja todavía está vacía.
 function setup() {
   ensureSheets_();
-  setUser_("karen", "CAMBIAR-CONTRASENA-KAREN", "admin", "Karen");
-  setUser_(
-    "taller",
-    "CAMBIAR-CONTRASENA-TALLER",
-    "operador",
-    "Encargada del taller",
-  );
-}
-function setUser_(username, password, role, name) {
-  const salt = Utilities.getUuid().replace(/-/g, "");
-  PropertiesService.getScriptProperties().setProperty(
-    "USER_" + username.toLowerCase(),
-    JSON.stringify({
-      username: username.toLowerCase(),
-      salt: salt,
-      verifier: hash_(salt + password),
-      role: role,
-      name: name,
-      active: true,
-    }),
-  );
-}
-function cambiarContrasenaKaren(nueva) {
-  setUser_("karen", nueva, "admin", "Karen");
-}
-function cambiarContrasenaTaller(nueva) {
-  setUser_("taller", nueva, "operador", "Encargada del taller");
 }
 
 function route_(a, p) {
-  if (a === "challenge") return challenge_(p);
   if (a === "login") return login_(p);
   const s = session_(p.token);
   if (a === "session") return publicUser_(s);
@@ -114,30 +103,11 @@ function route_(a, p) {
   throw Error("Acción no disponible");
 }
 function user_(username) {
-  const raw = PropertiesService.getScriptProperties().getProperty(
-    "USER_" + String(username || "").toLowerCase(),
-  );
-  return raw ? JSON.parse(raw) : null;
-}
-function challenge_(p) {
-  const u = user_(p.username);
-  if (!u || !u.active) throw Error("Usuario no autorizado");
-  const nonce = Utilities.getUuid().replace(/-/g, "");
-  CacheService.getScriptCache().put(
-    "CH_" + nonce,
-    u.username,
-    CFG.challengeMinutes * 60,
-  );
-  return { salt: u.salt, nonce: nonce };
+  return USERS[String(username || "").toLowerCase()] || null;
 }
 function login_(p) {
-  const u = user_(p.username),
-    cache = CacheService.getScriptCache(),
-    challengeUser = cache.get("CH_" + String(p.nonce || ""));
-  if (!u || !challengeUser || challengeUser !== u.username)
-    throw Error("Solicitud de acceso vencida");
-  cache.remove("CH_" + p.nonce);
-  if (hash_(u.verifier + p.nonce) !== p.proof)
+  const u = user_(p.username);
+  if (!u || !u.active || u.passwordHash !== String(p.passwordHash || ""))
     throw Error("Usuario o contraseña incorrectos");
   const token =
     Utilities.getUuid().replace(/-/g, "") +
