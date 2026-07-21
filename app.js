@@ -69,6 +69,29 @@ function jsonp(payload) {
     document.head.appendChild(s);
   });
 }
+function gasRequest(payload) {
+  return new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler((raw) => {
+        try {
+          const response = JSON.parse(raw);
+          if (!response.ok)
+            return reject(
+              Error(response.error || "No fue posible completar la operación"),
+            );
+          resolve(response.data);
+        } catch {
+          reject(Error("El servidor devolvió una respuesta inválida"));
+        }
+      })
+      .withFailureHandler((error) =>
+        reject(
+          Error(error?.message || "No fue posible conectar con el servidor"),
+        ),
+      )
+      .apiRequest(JSON.stringify(payload));
+  });
+}
 async function loginReal(data) {
   const passwordHash = await sha(data.password);
   const out = await jsonp({
@@ -84,9 +107,20 @@ async function api(action, data = {}) {
     await new Promise((r) => setTimeout(r, 120));
     return demoApi(action, data);
   }
-  if (action === "login") {
-    return loginReal(data);
+  if (window.google?.script?.run) {
+    if (action === "login") {
+      const passwordHash = await sha(data.password);
+      const out = await gasRequest({
+        action: "login",
+        username: data.username,
+        passwordHash,
+      });
+      localStorage.tallerToken = out.token;
+      return out.user;
+    }
+    return gasRequest({ action, token: localStorage.tallerToken, ...data });
   }
+  if (action === "login") return loginReal(data);
   return jsonp({ action, token: localStorage.tallerToken, ...data });
 }
 function demoApi(a, d) {

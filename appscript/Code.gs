@@ -62,12 +62,27 @@ const HEAD = {
 };
 
 function doGet(e) {
+  if (!e || !e.parameter || !e.parameter.payload) {
+    return HtmlService.createHtmlOutputFromFile("Index")
+      .setTitle("Control de Taller | Karen Vargas")
+      .addMetaTag("viewport", "width=device-width, initial-scale=1");
+  }
   try {
     const p = JSON.parse(e.parameter.payload || "{}"),
       out = route_(p.action, p);
     return reply_({ ok: true, data: out }, e.parameter.callback);
   } catch (err) {
     return reply_({ ok: false, error: err.message }, e.parameter.callback);
+  }
+}
+
+function apiRequest(payloadJson) {
+  try {
+    const p = JSON.parse(payloadJson || "{}"),
+      out = route_(p.action, p);
+    return JSON.stringify({ ok: true, data: out });
+  } catch (err) {
+    return JSON.stringify({ ok: false, error: err.message });
   }
 }
 function reply_(obj, cb) {
