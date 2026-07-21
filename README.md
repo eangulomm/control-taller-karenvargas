@@ -18,7 +18,7 @@ El proyecto inicia en modo demostración. Usuarios: `karen` y `taller`; contrase
 1. Crear una hoja de cálculo nueva.
 2. Abrir **Extensiones → Apps Script** y reemplazar `Code.gs` con `appscript/Code.gs`.
 3. Ejecutar `setup()` una vez y autorizar.
-4. Antes de ejecutar `setup()`, reemplazar temporalmente las dos contraseñas `CAMBIAR-CONTRASENA-...` dentro de esa función por las contraseñas privadas. Ejecutar `setup()` una vez y luego retirar las contraseñas visibles del editor.
+4. Ejecutar `setup()` una vez únicamente para crear las pestañas si la hoja está vacía. Las credenciales ya están incorporadas como huellas SHA-256 dentro de `Code.gs`.
 5. Desplegar como aplicación web: ejecutar como propietario y acceso para cualquier usuario.
 6. Copiar la URL `/exec` en `config.js` y cambiar `DEMO_MODE` a `false`.
 

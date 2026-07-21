@@ -7,6 +7,24 @@ const CFG = {
   },
   sessionHours: 720,
 };
+const USERS = {
+  karen: {
+    username: "karen",
+    passwordHash:
+      "93f2947d95ceabd3989ebd156b54c183e76ea006c4d93ad9557bead57701dfe5",
+    role: "admin",
+    name: "Karen",
+    active: true,
+  },
+  taller: {
+    username: "taller",
+    passwordHash:
+      "eaaedae85b40710496e7ba12793e2bd1323fcfd22b8ab04e6998dd7d78e04b4f",
+    role: "operador",
+    name: "Encargada del taller",
+    active: true,
+  },
+};
 const HEAD = {
   Trabajos: [
     "ID",
@@ -63,34 +81,9 @@ function reply_(obj, cb) {
   );
 }
 
-// Ejecutar una sola vez desde el editor. Después cambiar ambas contraseñas.
+// Opcional: crea las pestañas si la hoja todavía está vacía.
 function setup() {
   ensureSheets_();
-  setUser_("karen", "CAMBIAR-CONTRASENA-KAREN", "admin", "Karen");
-  setUser_(
-    "taller",
-    "CAMBIAR-CONTRASENA-TALLER",
-    "operador",
-    "Encargada del taller",
-  );
-}
-function setUser_(username, password, role, name) {
-  PropertiesService.getScriptProperties().setProperty(
-    "USER_" + username.toLowerCase(),
-    JSON.stringify({
-      username: username.toLowerCase(),
-      passwordHash: hash_(password),
-      role: role,
-      name: name,
-      active: true,
-    }),
-  );
-}
-function cambiarContrasenaKaren(nueva) {
-  setUser_("karen", nueva, "admin", "Karen");
-}
-function cambiarContrasenaTaller(nueva) {
-  setUser_("taller", nueva, "operador", "Encargada del taller");
 }
 
 function route_(a, p) {
@@ -110,10 +103,7 @@ function route_(a, p) {
   throw Error("Acción no disponible");
 }
 function user_(username) {
-  const raw = PropertiesService.getScriptProperties().getProperty(
-    "USER_" + String(username || "").toLowerCase(),
-  );
-  return raw ? JSON.parse(raw) : null;
+  return USERS[String(username || "").toLowerCase()] || null;
 }
 function login_(p) {
   const u = user_(p.username);
