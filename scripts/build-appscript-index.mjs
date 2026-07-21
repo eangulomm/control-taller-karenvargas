@@ -14,7 +14,7 @@ html = html.replace(
 );
 html = html.replace(
   /<script src="config\.js\?v=\d+"><\/script>\s*<script src="app\.js\?v=\d+"><\/script>/,
-  `<script>window.APP_CONFIG={API_URL:"",DEMO_MODE:false};</script>\n<script>\n${js.replaceAll("</script>", "<\\/script>")}\n</script>`,
+  `<script>window.APP_CONFIG={API_URL:"",DEMO_MODE:false};</script>\n<script>\n(function atelierApp(){\n${js.replaceAll("</script>", "<\\/script>")}\n})();\n</script>`,
 );
 
 fs.writeFileSync(path.join(root, "appscript", "Index.html"), html, "utf8");

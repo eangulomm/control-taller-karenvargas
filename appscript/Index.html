@@ -516,6 +516,7 @@ dialog form {
     <div id="toast"></div>
     <script>window.APP_CONFIG={API_URL:"",DEMO_MODE:false};</script>
 <script>
+(function atelierApp(){
 const $ = (s) => document.querySelector(s),
   $ = (s) => [...document.querySelectorAll(s)];
 const money = (n) =>
@@ -903,6 +904,7 @@ $("#closeWeek").onclick = async () => {
   } catch {}
 })();
 
+})();
 </script>
   </body>
 </html>
