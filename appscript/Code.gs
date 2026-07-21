@@ -1,353 +1,276 @@
-const CFG = {
-  sheets: {
-    works: "Trabajos",
-    payments: "Abonos",
-    closes: "Cierres",
-    audit: "Auditoria",
+const APP_KEY = "taller-kv-2026";
+const SHEETS = {
+  works: {
+    name: "Trabajos",
+    headers: [
+      "ID",
+      "Semana",
+      "Clienta",
+      "Vestido",
+      "Tipo",
+      "Estado",
+      "Valor",
+      "Nota",
+      "Creado el",
+      "Creado por",
+    ],
   },
-  sessionHours: 720,
-};
-const USERS = {
-  karen: {
-    username: "karen",
-    passwordHash:
-      "93f2947d95ceabd3989ebd156b54c183e76ea006c4d93ad9557bead57701dfe5",
-    role: "admin",
-    name: "Karen",
-    active: true,
+  payments: {
+    name: "Abonos",
+    headers: [
+      "ID",
+      "Semana",
+      "Fecha",
+      "Valor",
+      "Medio",
+      "Nota",
+      "Creado el",
+      "Creado por",
+    ],
   },
-  taller: {
-    username: "taller",
-    passwordHash:
-      "eaaedae85b40710496e7ba12793e2bd1323fcfd22b8ab04e6998dd7d78e04b4f",
-    role: "operador",
-    name: "Encargada del taller",
-    active: true,
+  closes: {
+    name: "Cierres",
+    headers: [
+      "Semana",
+      "Vestidos",
+      "Total",
+      "Abonado",
+      "Saldo",
+      "Cerrado el",
+      "Cerrado por",
+    ],
   },
-};
-const HEAD = {
-  Trabajos: [
-    "ID",
-    "Semana",
-    "Fecha",
-    "Clienta",
-    "Prenda",
-    "Tipo",
-    "Estado",
-    "Valor",
-    "Nota",
-    "Creado el",
-    "Creado por",
-  ],
-  Abonos: [
-    "ID",
-    "Semana",
-    "Fecha",
-    "Valor",
-    "Medio",
-    "Nota",
-    "Creado el",
-    "Creado por",
-  ],
-  Cierres: [
-    "Semana",
-    "Prendas",
-    "Producido",
-    "Abonado",
-    "Saldo",
-    "Cerrado el",
-    "Cerrado por",
-  ],
-  Auditoria: ["Fecha", "Usuario", "Evento", "Detalle"],
+  audit: {
+    name: "Auditoria",
+    headers: ["Fecha", "Usuario", "Evento", "Detalle"],
+  },
 };
 
 function doGet(e) {
-  if (!e || !e.parameter || !e.parameter.payload) {
-    return HtmlService.createHtmlOutputFromFile("Index")
-      .setTitle("Control de Taller | Karen Vargas")
-      .addMetaTag("viewport", "width=device-width, initial-scale=1");
-  }
   try {
-    const p = JSON.parse(e.parameter.payload || "{}"),
-      out = route_(p.action, p);
-    return reply_({ ok: true, data: out }, e.parameter.callback);
-  } catch (err) {
-    return reply_({ ok: false, error: err.message }, e.parameter.callback);
+    const payload = JSON.parse(e.parameter.payload || "{}");
+    if (payload.appKey !== APP_KEY) throw Error("Acceso no autorizado");
+    const data = route_(payload.action, payload);
+    return output_({ ok: true, data: data }, e.parameter.callback);
+  } catch (error) {
+    return output_({ ok: false, error: error.message }, e.parameter.callback);
   }
 }
 
-function apiRequest(payloadJson) {
-  try {
-    const p = JSON.parse(payloadJson || "{}"),
-      out = route_(p.action, p);
-    return JSON.stringify({ ok: true, data: out });
-  } catch (err) {
-    return JSON.stringify({ ok: false, error: err.message });
-  }
-}
-function reply_(obj, cb) {
-  const text = JSON.stringify(obj);
-  if (cb)
-    return ContentService.createTextOutput(cb + "(" + text + ")").setMimeType(
-      ContentService.MimeType.JAVASCRIPT,
-    );
-  return ContentService.createTextOutput(text).setMimeType(
-    ContentService.MimeType.JSON,
+function output_(value, callback) {
+  const json = JSON.stringify(value);
+  return ContentService.createTextOutput(
+    callback ? callback + "(" + json + ")" : json,
+  ).setMimeType(
+    callback
+      ? ContentService.MimeType.JAVASCRIPT
+      : ContentService.MimeType.JSON,
   );
 }
 
-// Opcional: crea las pestañas si la hoja todavía está vacía.
 function setup() {
-  ensureSheets_();
-}
-
-function route_(a, p) {
-  if (a === "login") return login_(p);
-  const s = session_(p.token);
-  if (a === "session") return publicUser_(s);
-  if (a === "logout") {
-    PropertiesService.getScriptProperties().deleteProperty(
-      "SESSION_" + p.token,
-    );
-    return true;
-  }
-  if (a === "list") return list_(p.week, s);
-  if (a === "saveWork") return saveWork_(p.item, s);
-  if (a === "savePayment") return savePayment_(p.item, s);
-  if (a === "closeWeek") return closeWeek_(p.week, s);
-  throw Error("Acción no disponible");
-}
-function user_(username) {
-  return USERS[String(username || "").toLowerCase()] || null;
-}
-function login_(p) {
-  const u = user_(p.username);
-  if (!u || !u.active || u.passwordHash !== String(p.passwordHash || ""))
-    throw Error("Usuario o contraseña incorrectos");
-  const token =
-    Utilities.getUuid().replace(/-/g, "") +
-    Utilities.getUuid().replace(/-/g, "");
-  PropertiesService.getScriptProperties().setProperty(
-    "SESSION_" + token,
-    JSON.stringify({
-      username: u.username,
-      name: u.name,
-      role: u.role,
-      expires: Date.now() + CFG.sessionHours * 3600000,
-    }),
-  );
-  audit_(u.name, "Inicio de sesión", "");
-  return { token: token, user: publicUser_(u) };
-}
-function session_(token) {
-  if (!token) throw Error("Debes iniciar sesión");
-  const props = PropertiesService.getScriptProperties(),
-    key = "SESSION_" + token,
-    raw = props.getProperty(key);
-  if (!raw) throw Error("Sesión vencida");
-  const s = JSON.parse(raw);
-  if (Date.now() > s.expires) {
-    props.deleteProperty(key);
-    throw Error("Sesión vencida");
-  }
-  return s;
-}
-function publicUser_(u) {
-  return { username: u.username, name: u.name, role: u.role };
-}
-function hash_(text) {
-  return Utilities.computeDigest(
-    Utilities.DigestAlgorithm.SHA_256,
-    text,
-    Utilities.Charset.UTF_8,
-  )
-    .map((b) => ("0" + ((b + 256) % 256).toString(16)).slice(-2))
-    .join("");
-}
-
-function ensureSheets_() {
-  const ss = SpreadsheetApp.getActive();
-  Object.keys(HEAD).forEach((n) => {
-    let sh = ss.getSheetByName(n);
-    if (!sh) sh = ss.insertSheet(n);
-    if (sh.getLastRow() === 0) {
-      sh.appendRow(HEAD[n]);
-      sh.setFrozenRows(1);
-      sh.getRange(1, 1, 1, HEAD[n].length)
+  Object.keys(SHEETS).forEach(function (key) {
+    const definition = SHEETS[key];
+    let sheet = SpreadsheetApp.getActive().getSheetByName(definition.name);
+    if (!sheet) sheet = SpreadsheetApp.getActive().insertSheet(definition.name);
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(definition.headers);
+      sheet.setFrozenRows(1);
+      sheet
+        .getRange(1, 1, 1, definition.headers.length)
         .setFontWeight("bold")
         .setBackground("#5b3046")
         .setFontColor("#ffffff");
     }
   });
 }
-function rows_(name) {
-  const sh = SpreadsheetApp.getActive().getSheetByName(name);
-  if (!sh || sh.getLastRow() < 2) return [];
-  const vals = sh
-      .getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn())
-      .getValues(),
-    h = HEAD[name];
-  return vals.map((r) => Object.fromEntries(h.map((x, i) => [x, r[i]])));
+
+function route_(action, payload) {
+  setup();
+  if (action === "list") return list_(payload.week);
+  if (action === "saveWork") return saveWork_(payload.item);
+  if (action === "savePayment") return savePayment_(payload.item);
+  if (action === "closeWeek") return closeWeek_(payload.week);
+  throw Error("Acción no disponible");
 }
-function closed_(week) {
-  return rows_("Cierres").some((x) => String(x.Semana) === String(week));
+
+function values_(key) {
+  const definition = SHEETS[key];
+  const sheet = SpreadsheetApp.getActive().getSheetByName(definition.name);
+  if (sheet.getLastRow() < 2) return [];
+  return sheet
+    .getRange(2, 1, sheet.getLastRow() - 1, definition.headers.length)
+    .getValues();
 }
-function list_(week, s) {
-  ensureSheets_();
-  const works = rows_("Trabajos")
-    .filter((x) => String(x.Semana) === week)
-    .map((x) => ({
-      id: x.ID,
-      week: x.Semana,
-      fecha: x.Fecha,
-      clienta: x.Clienta,
-      prenda: x.Prenda,
-      tipo: x.Tipo,
-      estado: x.Estado,
-      valor: Number(x.Valor),
-      nota: x.Nota,
-      createdAt: x["Creado el"],
-      createdBy: x["Creado por"],
-    }));
-  const payments = rows_("Abonos")
-    .filter((x) => String(x.Semana) === week)
-    .map((x) => ({
-      id: x.ID,
-      week: x.Semana,
-      fecha: x.Fecha,
-      valor: Number(x.Valor),
-      medio: x.Medio,
-      nota: x.Nota,
-      createdAt: x["Creado el"],
-      createdBy: x["Creado por"],
-    }));
-  const closes = rows_("Cierres")
-    .map((x) => ({
-      week: x.Semana,
-      count: Number(x.Prendas),
-      produced: Number(x.Producido),
-      paid: Number(x.Abonado),
-      balance: Number(x.Saldo),
-      closedAt: x["Cerrado el"],
-      closedBy: x["Cerrado por"],
-    }))
+function isClosed_(week) {
+  return values_("closes").some(function (row) {
+    return String(row[0]) === String(week);
+  });
+}
+function assertWeek_(week) {
+  if (!/^\d{4}-W\d{2}$/.test(String(week || "")))
+    throw Error("Semana inválida");
+}
+function withLock_(callback) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    return callback();
+  } finally {
+    lock.releaseLock();
+  }
+}
+function audit_(user, event, detail) {
+  SpreadsheetApp.getActive()
+    .getSheetByName(SHEETS.audit.name)
+    .appendRow([new Date(), user, event, detail]);
+}
+
+function list_(week) {
+  assertWeek_(week);
+  const works = values_("works")
+    .filter(function (row) {
+      return String(row[1]) === week;
+    })
+    .map(function (row) {
+      return {
+        id: row[0],
+        week: row[1],
+        client: row[2],
+        garment: row[3],
+        type: row[4],
+        status: row[5],
+        value: Number(row[6]),
+        note: row[7],
+        createdAt: row[8],
+        createdBy: row[9],
+      };
+    });
+  const payments = values_("payments")
+    .filter(function (row) {
+      return String(row[1]) === week;
+    })
+    .map(function (row) {
+      return {
+        id: row[0],
+        week: row[1],
+        date: row[2],
+        value: Number(row[3]),
+        method: row[4],
+        note: row[5],
+        createdAt: row[6],
+        createdBy: row[7],
+      };
+    });
+  const closes = values_("closes")
+    .map(function (row) {
+      return {
+        week: row[0],
+        count: Number(row[1]),
+        total: Number(row[2]),
+        paid: Number(row[3]),
+        balance: Number(row[4]),
+        closedAt: row[5],
+        closedBy: row[6],
+      };
+    })
     .reverse();
-  const audit =
-    s.role === "admin"
-      ? rows_("Auditoria")
-          .map((x) => ({
-            at: x.Fecha,
-            user: x.Usuario,
-            event: x.Evento,
-            detail: x.Detalle,
-          }))
-          .reverse()
-          .slice(0, 300)
-      : [];
+  const audit = values_("audit")
+    .map(function (row) {
+      return { at: row[0], user: row[1], event: row[2], detail: row[3] };
+    })
+    .reverse()
+    .slice(0, 300);
   return {
     works: works,
     payments: payments,
     closes: closes,
     audit: audit,
-    closed: closed_(week),
+    closed: isClosed_(week),
   };
 }
-function saveWork_(x, s) {
-  validateWeek_(x.week);
-  if (closed_(x.week)) throw Error("La semana está cerrada");
-  if (!x.clienta || !x.prenda || Number(x.valor) < 0)
-    throw Error("Completa los datos del trabajo");
-  return locked_(() => {
-    if (closed_(x.week)) throw Error("La semana está cerrada");
+
+function saveWork_(item) {
+  assertWeek_(item.week);
+  if (!item.client || !item.garment || Number(item.value) < 0)
+    throw Error("Completa los datos del vestido");
+  return withLock_(function () {
+    if (isClosed_(item.week)) throw Error("La semana está cerrada");
     SpreadsheetApp.getActive()
-      .getSheetByName("Trabajos")
+      .getSheetByName(SHEETS.works.name)
       .appendRow([
         Utilities.getUuid(),
-        x.week,
+        item.week,
+        item.client,
+        item.garment,
+        item.type,
+        item.status,
+        Number(item.value),
+        item.note || "",
         new Date(),
-        x.clienta,
-        x.prenda,
-        x.tipo,
-        x.estado,
-        Number(x.valor),
-        x.nota || "",
-        new Date(),
-        s.name,
+        item.createdBy || "Taller",
       ]);
     audit_(
-      s.name,
-      "Registró trabajo",
-      x.clienta + " · " + x.prenda + " · $" + Number(x.valor),
+      item.createdBy || "Taller",
+      "Registró vestido",
+      item.client + " · " + item.garment,
     );
     return true;
   });
 }
-function savePayment_(x, s) {
-  admin_(s);
-  validateWeek_(x.week);
-  if (closed_(x.week)) throw Error("La semana está cerrada");
-  if (Number(x.valor) <= 0) throw Error("El abono debe ser mayor que cero");
-  return locked_(() => {
-    if (closed_(x.week)) throw Error("La semana está cerrada");
+function savePayment_(item) {
+  assertWeek_(item.week);
+  if (Number(item.value) <= 0) throw Error("El abono debe ser mayor que cero");
+  return withLock_(function () {
+    if (isClosed_(item.week)) throw Error("La semana está cerrada");
     SpreadsheetApp.getActive()
-      .getSheetByName("Abonos")
+      .getSheetByName(SHEETS.payments.name)
       .appendRow([
         Utilities.getUuid(),
-        x.week,
-        x.fecha,
-        Number(x.valor),
-        x.medio,
-        x.nota || "",
+        item.week,
+        item.date,
+        Number(item.value),
+        item.method,
+        item.note || "",
         new Date(),
-        s.name,
+        item.createdBy || "Karen",
       ]);
-    audit_(s.name, "Registró abono", x.week + " · $" + Number(x.valor));
+    audit_(
+      item.createdBy || "Karen",
+      "Registró abono",
+      item.week + " · $" + Number(item.value),
+    );
     return true;
   });
 }
-function closeWeek_(week, s) {
-  admin_(s);
-  validateWeek_(week);
-  return locked_(() => {
-    if (closed_(week)) throw Error("La semana ya está cerrada");
-    const w = rows_("Trabajos").filter((x) => String(x.Semana) === week),
-      p = rows_("Abonos").filter((x) => String(x.Semana) === week),
-      produced = w.reduce((a, x) => a + Number(x.Valor), 0),
-      paid = p.reduce((a, x) => a + Number(x.Valor), 0);
+function closeWeek_(week) {
+  assertWeek_(week);
+  return withLock_(function () {
+    if (isClosed_(week)) throw Error("La semana ya está cerrada");
+    const works = values_("works").filter(function (row) {
+      return String(row[1]) === week;
+    });
+    const payments = values_("payments").filter(function (row) {
+      return String(row[1]) === week;
+    });
+    const total = works.reduce(function (sum, row) {
+      return sum + Number(row[6]);
+    }, 0);
+    const paid = payments.reduce(function (sum, row) {
+      return sum + Number(row[3]);
+    }, 0);
     SpreadsheetApp.getActive()
-      .getSheetByName("Cierres")
+      .getSheetByName(SHEETS.closes.name)
       .appendRow([
         week,
-        w.length,
-        produced,
+        works.length,
+        total,
         paid,
-        produced - paid,
+        total - paid,
         new Date(),
-        s.name,
+        "Karen",
       ]);
-    audit_(s.name, "Cerró semana", week + " · saldo $" + (produced - paid));
+    audit_("Karen", "Cerró semana", week);
     return true;
   });
-}
-function audit_(user, event, detail) {
-  ensureSheets_();
-  SpreadsheetApp.getActive()
-    .getSheetByName("Auditoria")
-    .appendRow([new Date(), user, event, detail]);
-}
-function locked_(fn) {
-  const l = LockService.getScriptLock();
-  l.waitLock(10000);
-  try {
-    return fn();
-  } finally {
-    l.releaseLock();
-  }
-}
-function admin_(s) {
-  if (s.role !== "admin")
-    throw Error("Esta acción solo la puede realizar Karen");
-}
-function validateWeek_(w) {
-  if (!/^\d{4}-W\d{2}$/.test(String(w || ""))) throw Error("Semana inválida");
 }

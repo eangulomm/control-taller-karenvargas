@@ -1,196 +1,183 @@
 <!doctype html>
 <html lang="es">
   <head>
-    <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width,initial-scale=1,viewport-fit=cover"
-    />
-    <meta name="theme-color" content="#371f2d" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#4d283b" />
     <title>Control de Taller | Karen Vargas</title>
-    <link rel="stylesheet" href="styles.css?v=8" />
+    <link rel="stylesheet" href="styles.css?v=1" />
   </head>
   <body>
-    <section id="login" class="login-shell">
-      <form id="loginForm" class="card login-card">
-        <p class="eyebrow">ATELIER KAREN VARGAS</p>
+    <section id="loginScreen" class="login-screen">
+      <form id="loginForm" class="login-card">
+        <span class="brand">ATELIER KAREN VARGAS</span>
         <h1>Control de taller</h1>
-        <p class="muted">Producción, abonos y cuentas semanales.</p>
+        <p>Producción, entregas y cuentas semanales.</p>
         <label
-          >Usuario<input id="username" autocomplete="username" required
+          >Usuario<input id="loginUser" autocomplete="username" required
         /></label>
         <label
           >Contraseña<input
-            id="password"
+            id="loginPassword"
             type="password"
             autocomplete="current-password"
             required
         /></label>
-        <button class="primary" type="submit">Iniciar sesión</button>
-        <p id="loginError" class="error"></p>
+        <button id="loginButton" class="primary" type="submit">
+          Iniciar sesión
+        </button>
+        <p id="loginError" class="error" aria-live="polite"></p>
       </form>
     </section>
 
-    <div id="app" hidden>
+    <div id="system" hidden>
       <header>
         <div>
-          <p class="eyebrow">ATELIER KAREN VARGAS</p>
+          <span class="brand">ATELIER KAREN VARGAS</span>
           <h1>Control de taller</h1>
         </div>
-        <div class="header-actions">
-          <span id="userBadge" class="badge"></span
-          ><button id="logoutBtn" class="ghost">Cerrar sesión</button>
+        <div class="user-actions">
+          <span id="userRole" class="pill"></span
+          ><button id="logoutButton" class="outline">Cerrar sesión</button>
         </div>
       </header>
       <nav>
-        <button data-view="dashboard" class="active">Resumen</button>
-        <button data-view="trabajos">Trabajos</button>
-        <button data-view="abonos">Abonos</button>
-        <button data-view="cierres">Historial</button>
-        <button data-view="auditoria" data-admin>Auditoría</button>
+        <button class="active" data-page="summary">Resumen</button>
+        <button data-page="works">Vestidos</button>
+        <button data-page="payments">Abonos</button>
+        <button data-page="history">Cierres</button>
+        <button data-page="audit" data-admin>Auditoría</button>
       </nav>
       <main>
-        <section id="dashboard" class="view active">
-          <div class="toolbar">
+        <section id="summary" class="page active">
+          <div class="page-title">
             <div>
-              <p class="eyebrow">SEMANA</p>
-              <h2 id="weekTitle"></h2>
+              <span class="brand">SEMANA</span>
+              <h2 id="weekLabel"></h2>
             </div>
-            <input id="weekPicker" type="week" />
+            <input id="weekInput" type="week" />
           </div>
-          <div class="metrics">
+          <div class="stats">
             <article>
-              <span>Prendas</span><strong id="mCount">0</strong>
+              <span>Vestidos</span><strong id="statWorks">0</strong>
             </article>
             <article>
-              <span>Producido</span><strong id="mProduced">$0</strong>
+              <span>Total trabajos</span><strong id="statTotal">$0</strong>
             </article>
             <article>
-              <span>Abonado</span><strong id="mPaid">$0</strong>
+              <span>Abonado</span><strong id="statPaid">$0</strong>
             </article>
             <article>
-              <span id="balanceLabel">Saldo pendiente</span
-              ><strong id="mBalance">$0</strong>
+              <span id="balanceTitle">Saldo pendiente</span
+              ><strong id="statBalance">$0</strong>
             </article>
           </div>
-          <div class="card">
-            <div class="card-head">
-              <h3>Estado de producción</h3>
-              <span id="weekStatus" class="badge"></span>
+          <section class="panel">
+            <div class="panel-title">
+              <h3>Estado de la semana</h3>
+              <span id="weekState" class="pill"></span>
             </div>
-            <div id="statusBars"></div>
-          </div>
-          <div class="quick">
-            <button data-open="work" class="primary">+ Registrar trabajo</button
-            ><button data-open="payment" class="secondary" data-admin>
+            <div id="statusSummary"></div>
+          </section>
+          <div class="actions">
+            <button class="primary" data-open-work>+ Registrar vestido</button
+            ><button class="secondary" data-open-payment data-admin>
               + Registrar abono</button
-            ><button id="closeWeek" class="danger" data-admin>
+            ><button id="closeWeekButton" class="danger" data-admin>
               Cerrar semana
             </button>
           </div>
         </section>
 
-        <section id="trabajos" class="view">
-          <div class="toolbar">
-            <h2>Trabajos de la semana</h2>
-            <button data-open="work" class="primary">+ Nuevo</button>
+        <section id="works" class="page">
+          <div class="page-title">
+            <h2>Vestidos de la semana</h2>
+            <button class="primary" data-open-work>+ Registrar</button>
           </div>
-          <div id="workList" class="list"></div>
+          <div id="worksList" class="records"></div>
         </section>
-        <section id="abonos" class="view">
-          <div class="toolbar">
-            <h2>Abonos</h2>
-            <button data-open="payment" class="primary" data-admin>
+        <section id="payments" class="page">
+          <div class="page-title">
+            <h2>Abonos de la semana</h2>
+            <button class="primary" data-open-payment data-admin>
               + Registrar
             </button>
           </div>
-          <div id="paymentList" class="list"></div>
+          <div id="paymentsList" class="records"></div>
         </section>
-        <section id="cierres" class="view">
-          <div class="toolbar"><h2>Semanas cerradas</h2></div>
-          <div id="closeList" class="list"></div>
+        <section id="history" class="page">
+          <div class="page-title"><h2>Historial semanal</h2></div>
+          <div id="historyList" class="records"></div>
         </section>
-        <section id="auditoria" class="view">
-          <div class="toolbar"><h2>Registro de actividad</h2></div>
-          <div id="auditList" class="list"></div>
+        <section id="audit" class="page">
+          <div class="page-title"><h2>Auditoría</h2></div>
+          <div id="auditList" class="records"></div>
         </section>
       </main>
     </div>
 
     <dialog id="workDialog">
       <form id="workForm">
-        <div class="card-head">
-          <h2>Registrar trabajo</h2>
-          <button type="button" data-close="workDialog" class="icon">×</button>
+        <div class="dialog-title">
+          <h2>Registrar vestido</h2>
+          <button type="button" data-close="workDialog">×</button>
         </div>
-        <input name="id" type="hidden" /><label
-          >Clienta<input name="clienta" required /></label
-        ><label
-          >Prenda o descripción<input
-            name="prenda"
-            required
-            placeholder="Vestido largo, conjunto..."
-        /></label>
-        <div class="grid">
+        <label>Clienta<input name="client" required /></label
+        ><label>Vestido o descripción<input name="garment" required /></label>
+        <div class="two">
           <label
-            >Trabajo<select name="tipo">
+            >Trabajo<select name="type">
               <option>Corte y confección</option>
               <option>Corte</option>
               <option>Confección</option>
               <option>Arreglo</option>
             </select></label
           ><label
-            >Estado<select name="estado">
-              <option>Pendiente</option>
-              <option>En proceso</option>
+            >Estado<select name="status">
+              <option>Cortado</option>
+              <option>En confección</option>
               <option>Terminado</option>
               <option>Entregado</option>
             </select></label
           >
         </div>
         <label
-          >Valor acordado<input
-            name="valor"
+          >Valor<input
+            name="value"
             type="number"
             min="0"
             step="1000"
             required /></label
-        ><label>Nota<textarea name="nota" rows="3"></textarea></label
-        ><button id="saveWorkBtn" type="button" class="primary">
-          Guardar trabajo
-        </button>
+        ><label>Nota<textarea name="note" rows="3"></textarea></label
+        ><button class="primary" type="submit">Guardar vestido</button>
       </form>
     </dialog>
     <dialog id="paymentDialog">
       <form id="paymentForm">
-        <div class="card-head">
+        <div class="dialog-title">
           <h2>Registrar abono</h2>
-          <button type="button" data-close="paymentDialog" class="icon">
-            ×
-          </button>
+          <button type="button" data-close="paymentDialog">×</button>
         </div>
-        <label>Fecha<input name="fecha" type="date" required /></label
+        <label>Fecha<input name="date" type="date" required /></label
         ><label
-          >Valor entregado<input
-            name="valor"
+          >Valor<input
+            name="value"
             type="number"
             min="1"
             step="1000"
             required /></label
         ><label
-          >Medio<select name="medio">
+          >Medio<select name="method">
             <option>Transferencia</option>
             <option>Efectivo</option>
             <option>Otro</option>
           </select></label
-        ><label>Nota o comprobante<input name="nota" /></label
-        ><button id="savePaymentBtn" type="button" class="primary">
-          Guardar abono
-        </button>
+        ><label>Nota<input name="note" /></label
+        ><button class="primary" type="submit">Guardar abono</button>
       </form>
     </dialog>
-    <div id="toast"></div>
-    <script src="config.js?v=8"></script>
-    <script src="app.js?v=8"></script>
+    <div id="toast" role="status"></div>
+    <script src="config.js?v=1"></script>
+    <script src="app.js?v=1"></script>
   </body>
 </html>

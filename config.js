@@ -1,5 +1,5 @@
-window.APP_CONFIG = {
-  API_URL:
-    "https://script.google.com/macros/s/AKfycby5wsj00NEqNoe9tQYDfrULkfxfegZnXyxxlBYbvuTeDkECiKwLbyxQZapf39TffKmv/exec",
-  DEMO_MODE: false,
+window.SYSTEM_CONFIG = {
+  API_URL: "",
+  APP_KEY: "taller-kv-2026",
+  DEMO_MODE: true,
 };

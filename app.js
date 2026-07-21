@@ -1,386 +1,348 @@
-const $ = (s) => document.querySelector(s),
-  $$ = (s) => [...document.querySelectorAll(s)];
-const money = (n) =>
-  new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    maximumFractionDigits: 0,
-  }).format(Number(n) || 0);
-const today = () => new Date().toISOString().slice(0, 10);
-function isoWeek(d = new Date()) {
-  const x = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  x.setUTCDate(x.getUTCDate() + 4 - (x.getUTCDay() || 7));
-  const y = new Date(Date.UTC(x.getUTCFullYear(), 0, 1));
-  return `${x.getUTCFullYear()}-W${String(Math.ceil(((x - y) / 86400000 + 1) / 7)).padStart(2, "0")}`;
-}
-let state = {
-  user: null,
-  week: isoWeek(),
-  works: [],
-  payments: [],
-  closes: [],
-  audit: [],
-  closed: false,
-};
-const demo = {
-  users: {
-    karen: { password: "demo", role: "admin", name: "Karen" },
+(() => {
+  "use strict";
+  const one = (selector) => document.querySelector(selector);
+  const all = (selector) => [...document.querySelectorAll(selector)];
+  const USERS = {
+    karen: {
+      hash: "93f2947d95ceabd3989ebd156b54c183e76ea006c4d93ad9557bead57701dfe5",
+      role: "admin",
+      name: "Karen",
+    },
     taller: {
-      password: "demo",
-      role: "operador",
+      hash: "eaaedae85b40710496e7ba12793e2bd1323fcfd22b8ab04e6998dd7d78e04b4f",
+      role: "operator",
       name: "Encargada del taller",
     },
-  },
-};
-const sha = async (t) =>
-  [
-    ...new Uint8Array(
-      await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)),
-    ),
-  ]
-    .map((x) => x.toString(16).padStart(2, "0"))
-    .join("");
-function jsonp(payload) {
-  return new Promise((resolve, reject) => {
-    const cb = "tallerCb" + Date.now() + Math.random().toString(16).slice(2),
-      s = document.createElement("script"),
-      timer = setTimeout(
-        () => done(null, Error("El servidor tardó demasiado")),
+  };
+  const money = (value) =>
+    new Intl.NumberFormat("es-CO", {
+      style: "currency",
+      currency: "COP",
+      maximumFractionDigits: 0,
+    }).format(Number(value) || 0);
+  const escapeHtml = (value) =>
+    String(value ?? "").replace(
+      /[&<>"']/g,
+      (char) =>
+        ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        })[char],
+    );
+  const sha256 = async (text) =>
+    [
+      ...new Uint8Array(
+        await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)),
+      ),
+    ]
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+  const currentWeek = () => {
+    const now = new Date();
+    const date = new Date(
+      Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()),
+    );
+    date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    return `${date.getUTCFullYear()}-W${String(Math.ceil(((date - yearStart) / 86400000 + 1) / 7)).padStart(2, "0")}`;
+  };
+  const today = () => new Date().toISOString().slice(0, 10);
+  let state = {
+    user: null,
+    week: currentWeek(),
+    works: [],
+    payments: [],
+    closes: [],
+    audit: [],
+    closed: false,
+  };
+
+  function jsonp(payload) {
+    return new Promise((resolve, reject) => {
+      const callback = `kv_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+      const script = document.createElement("script");
+      const timer = setTimeout(
+        () => finish(null, Error("No fue posible conectar con Google Sheets")),
         15000,
       );
-    function done(v, e) {
-      clearTimeout(timer);
-      delete window[cb];
-      s.remove();
-      e ? reject(e) : resolve(v);
-    }
-    window[cb] = (r) =>
-      r.ok
-        ? done(r.data)
-        : done(null, Error(r.error || "No fue posible completar la operación"));
-    s.onerror = () =>
-      done(null, Error("No fue posible conectar con el servidor"));
-    s.src =
-      window.APP_CONFIG.API_URL +
-      "?callback=" +
-      cb +
-      "&payload=" +
-      encodeURIComponent(JSON.stringify(payload));
-    document.head.appendChild(s);
-  });
-}
-function gasRequest(payload) {
-  return new Promise((resolve, reject) => {
-    google.script.run
-      .withSuccessHandler((raw) => {
-        try {
-          const response = JSON.parse(raw);
-          if (!response.ok)
-            return reject(
+      function finish(value, error) {
+        clearTimeout(timer);
+        delete window[callback];
+        script.remove();
+        error ? reject(error) : resolve(value);
+      }
+      window[callback] = (response) =>
+        response.ok
+          ? finish(response.data)
+          : finish(
+              null,
               Error(response.error || "No fue posible completar la operación"),
             );
-          resolve(response.data);
-        } catch {
-          reject(Error("El servidor devolvió una respuesta inválida"));
-        }
-      })
-      .withFailureHandler((error) =>
-        reject(
-          Error(error?.message || "No fue posible conectar con el servidor"),
-        ),
-      )
-      .apiRequest(JSON.stringify(payload));
-  });
-}
-async function loginReal(data) {
-  const passwordHash = await sha(data.password);
-  const out = await jsonp({
-    action: "login",
-    username: data.username,
-    passwordHash,
-  });
-  localStorage.tallerToken = out.token;
-  return out.user;
-}
-async function api(action, data = {}) {
-  if (window.APP_CONFIG.DEMO_MODE) {
-    await new Promise((r) => setTimeout(r, 120));
-    return demoApi(action, data);
-  }
-  if (window.google?.script?.run) {
-    if (action === "login") {
-      const passwordHash = await sha(data.password);
-      const out = await gasRequest({
-        action: "login",
-        username: data.username,
-        passwordHash,
-      });
-      localStorage.tallerToken = out.token;
-      return out.user;
-    }
-    return gasRequest({ action, token: localStorage.tallerToken, ...data });
-  }
-  if (action === "login") return loginReal(data);
-  return jsonp({ action, token: localStorage.tallerToken, ...data });
-}
-function demoApi(a, d) {
-  const db = JSON.parse(
-    localStorage.tallerDemo ||
-      '{"works":[],"payments":[],"closes":[],"audit":[]}',
-  );
-  const save = () => (localStorage.tallerDemo = JSON.stringify(db));
-  if (a === "login") {
-    const u = demo.users[d.username];
-    if (!u || u.password !== d.password)
-      throw Error("Usuario o contraseña incorrectos");
-    localStorage.tallerToken = d.username;
-    return u;
-  }
-  if (a === "logout") {
-    localStorage.removeItem("tallerToken");
-    return true;
-  }
-  if (a === "session") {
-    const u = demo.users[localStorage.tallerToken];
-    if (!u) throw Error("Sesión vencida");
-    return u;
-  }
-  if (a === "list")
-    return {
-      ...db,
-      closed: db.closes.some((x) => x.week === d.week),
-      works: db.works.filter((x) => x.week === d.week),
-      payments: db.payments.filter((x) => x.week === d.week),
-    };
-  const u = demo.users[localStorage.tallerToken];
-  if (!u) throw Error("Sin autorización");
-  if (a === "saveWork") {
-    if (db.closes.some((x) => x.week === d.item.week))
-      throw Error("La semana está cerrada");
-    db.works.push({
-      ...d.item,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-      createdBy: u.name,
+      script.onerror = () =>
+        finish(
+          null,
+          Error("El navegador bloqueó la conexión con Google Sheets"),
+        );
+      script.src = `${window.SYSTEM_CONFIG.API_URL}?callback=${callback}&payload=${encodeURIComponent(JSON.stringify({ ...payload, appKey: window.SYSTEM_CONFIG.APP_KEY }))}`;
+      document.head.appendChild(script);
     });
-    db.audit.unshift({
-      at: new Date().toISOString(),
-      user: u.name,
-      event: "Registró trabajo",
-      detail: d.item.clienta,
-    });
-    save();
-    return true;
   }
-  if (a === "savePayment") {
-    if (u.role !== "admin") throw Error("Solo Karen registra abonos");
-    if (db.closes.some((x) => x.week === d.item.week))
-      throw Error("La semana está cerrada");
-    db.payments.push({
-      ...d.item,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-      createdBy: u.name,
-    });
-    db.audit.unshift({
-      at: new Date().toISOString(),
-      user: u.name,
-      event: "Registró abono",
-      detail: money(d.item.valor),
-    });
-    save();
-    return true;
-  }
-  if (a === "closeWeek") {
-    if (u.role !== "admin") throw Error("Solo Karen puede cerrar");
-    if (db.closes.some((x) => x.week === d.week))
-      throw Error("Ya está cerrada");
-    const works = db.works.filter((x) => x.week === d.week),
-      pays = db.payments.filter((x) => x.week === d.week);
-    db.closes.unshift({
-      week: d.week,
-      count: works.length,
-      produced: works.reduce((s, x) => s + Number(x.valor), 0),
-      paid: pays.reduce((s, x) => s + Number(x.valor), 0),
-      closedAt: new Date().toISOString(),
-      closedBy: u.name,
-    });
-    db.audit.unshift({
-      at: new Date().toISOString(),
-      user: u.name,
-      event: "Cerró semana",
-      detail: d.week,
-    });
-    save();
-    return true;
-  }
-  throw Error("Acción no disponible");
-}
-function toast(t) {
-  $("#toast").textContent = t;
-  $("#toast").classList.add("show");
-  setTimeout(() => $("#toast").classList.remove("show"), 2200);
-}
-async function load() {
-  const d = await api("list", { week: state.week });
-  Object.assign(state, d);
-  render();
-}
-function render() {
-  const produced = state.works.reduce((s, x) => s + Number(x.valor), 0),
-    paid = state.payments.reduce((s, x) => s + Number(x.valor), 0),
-    bal = produced - paid;
-  $("#weekTitle").textContent = state.week.replace("-W", " · Semana ");
-  $("#mCount").textContent = state.works.length;
-  $("#mProduced").textContent = money(produced);
-  $("#mPaid").textContent = money(paid);
-  $("#balanceLabel").textContent =
-    bal >= 0 ? "Saldo pendiente" : "Saldo a favor de Karen";
-  $("#mBalance").textContent = money(Math.abs(bal));
-  $("#weekStatus").textContent = state.closed
-    ? "Cerrada · sin modificaciones"
-    : "Abierta";
-  const statuses = ["Pendiente", "En proceso", "Terminado", "Entregado"];
-  $("#statusBars").innerHTML = statuses
-    .map((s) => {
-      const n = state.works.filter((x) => x.estado === s).length,
-        p = state.works.length ? Math.round((n / state.works.length) * 100) : 0;
-      return `<div class="bar"><span>${s}</span><div class="track"><div class="fill" style="width:${p}%"></div></div><b>${n}</b></div>`;
-    })
-    .join("");
-  $("#workList").innerHTML = state.works.length
-    ? state.works
-        .map(
-          (x) =>
-            `<article class="row"><div><b>${esc(x.clienta)}</b><p>${esc(x.prenda)} · ${esc(x.tipo)}</p><span class="badge">${esc(x.estado)}</span><p class="muted">Registró: ${esc(x.createdBy)}</p></div><span class="money">${money(x.valor)}</span></article>`,
-        )
-        .join("")
-    : '<div class="empty">No hay trabajos registrados esta semana.</div>';
-  $("#paymentList").innerHTML = state.payments.length
-    ? state.payments
-        .map(
-          (x) =>
-            `<article class="row"><div><b>${x.fecha} · ${esc(x.medio)}</b><p>${esc(x.nota || "Sin nota")}</p><p class="muted">Registró: ${esc(x.createdBy)}</p></div><span class="money">${money(x.valor)}</span></article>`,
-        )
-        .join("")
-    : '<div class="empty">No hay abonos registrados esta semana.</div>';
-  $("#closeList").innerHTML = state.closes.length
-    ? state.closes
-        .map(
-          (x) =>
-            `<article class="row"><div><b>${x.week}</b><p>${x.count} prendas · Cerró ${esc(x.closedBy)}</p><p class="muted">${new Date(x.closedAt).toLocaleString("es-CO")}</p></div><div><div class="money">${money(x.produced - x.paid)}</div><small>saldo al cierre</small></div></article>`,
-        )
-        .join("")
-    : '<div class="empty">Aún no hay cierres.</div>';
-  $("#auditList").innerHTML =
-    state.audit
-      .map(
-        (x) =>
-          `<article class="row"><div><b>${esc(x.event)}</b><p>${esc(x.user)} · ${esc(x.detail)}</p></div><small>${new Date(x.at).toLocaleString("es-CO")}</small></article>`,
-      )
-      .join("") || '<div class="empty">Sin actividad.</div>';
-  $$("[data-open]").forEach((b) => (b.disabled = state.closed));
-  $("#closeWeek").disabled = state.closed;
-}
-const esc = (s) =>
-  String(s ?? "").replace(
-    /[&<>"']/g,
-    (c) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
-        c
-      ],
-  );
-function enter(u) {
-  state.user = u;
-  $("#login").hidden = true;
-  $("#app").hidden = false;
-  $("#userBadge").textContent =
-    `${u.name} · ${u.role === "admin" ? "Administradora" : "Taller"}`;
-  $$("[data-admin]").forEach((x) => (x.hidden = u.role !== "admin"));
-  load();
-}
-$("#loginForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const b = $("#loginForm button[type='submit']");
-  b.disabled = true;
-  b.setAttribute("aria-busy", "true");
-  b.textContent = "Ingresando…";
-  $("#loginError").textContent = "";
-  try {
-    enter(
-      await api("login", {
-        username: $("#username").value.trim().toLowerCase(),
-        password: $("#password").value,
-      }),
+  function demoDatabase() {
+    return JSON.parse(
+      localStorage.getItem("kvWorkshopDemo") ||
+        '{"works":[],"payments":[],"closes":[],"audit":[]}',
     );
-  } catch (x) {
-    $("#loginError").textContent = x.message;
-  } finally {
-    b.disabled = false;
-    b.removeAttribute("aria-busy");
-    b.textContent = "Iniciar sesión";
   }
-});
-$("#logoutBtn").onclick = async () => {
-  await api("logout");
-  location.reload();
-};
-$$("nav button").forEach(
-  (b) =>
-    (b.onclick = () => {
-      $$("nav button,.view").forEach((x) => x.classList.remove("active"));
-      b.classList.add("active");
-      $("#" + b.dataset.view).classList.add("active");
+  function saveDemo(db) {
+    localStorage.setItem("kvWorkshopDemo", JSON.stringify(db));
+  }
+  function demoApi(action, data) {
+    const db = demoDatabase();
+    if (action === "list")
+      return {
+        works: db.works.filter((x) => x.week === data.week),
+        payments: db.payments.filter((x) => x.week === data.week),
+        closes: db.closes,
+        audit: db.audit,
+        closed: db.closes.some((x) => x.week === data.week),
+      };
+    if (action === "saveWork") {
+      db.works.push({
+        ...data.item,
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        createdBy: state.user.name,
+      });
+      db.audit.unshift({
+        at: new Date().toISOString(),
+        user: state.user.name,
+        event: "Registró vestido",
+        detail: data.item.client,
+      });
+      saveDemo(db);
+      return true;
+    }
+    if (action === "savePayment") {
+      db.payments.push({
+        ...data.item,
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        createdBy: state.user.name,
+      });
+      db.audit.unshift({
+        at: new Date().toISOString(),
+        user: state.user.name,
+        event: "Registró abono",
+        detail: money(data.item.value),
+      });
+      saveDemo(db);
+      return true;
+    }
+    if (action === "closeWeek") {
+      const works = db.works.filter((x) => x.week === data.week),
+        payments = db.payments.filter((x) => x.week === data.week);
+      const total = works.reduce((sum, x) => sum + Number(x.value), 0),
+        paid = payments.reduce((sum, x) => sum + Number(x.value), 0);
+      db.closes.unshift({
+        week: data.week,
+        count: works.length,
+        total,
+        paid,
+        balance: total - paid,
+        closedAt: new Date().toISOString(),
+        closedBy: state.user.name,
+      });
+      db.audit.unshift({
+        at: new Date().toISOString(),
+        user: state.user.name,
+        event: "Cerró semana",
+        detail: data.week,
+      });
+      saveDemo(db);
+      return true;
+    }
+    throw Error("Acción no disponible");
+  }
+  async function api(action, data = {}) {
+    if (window.SYSTEM_CONFIG.DEMO_MODE || !window.SYSTEM_CONFIG.API_URL)
+      return demoApi(action, data);
+    return jsonp({ action, ...data });
+  }
+  function toast(message) {
+    one("#toast").textContent = message;
+    one("#toast").classList.add("show");
+    setTimeout(() => one("#toast").classList.remove("show"), 2200);
+  }
+  async function load() {
+    const data = await api("list", { week: state.week });
+    Object.assign(state, data);
+    render();
+  }
+  function render() {
+    const total = state.works.reduce(
+      (sum, item) => sum + Number(item.value),
+      0,
+    );
+    const paid = state.payments.reduce(
+      (sum, item) => sum + Number(item.value),
+      0,
+    );
+    const balance = total - paid;
+    one("#weekLabel").textContent = state.week.replace("-W", " · Semana ");
+    one("#statWorks").textContent = state.works.length;
+    one("#statTotal").textContent = money(total);
+    one("#statPaid").textContent = money(paid);
+    one("#balanceTitle").textContent =
+      balance >= 0 ? "Saldo pendiente" : "Saldo a favor de Karen";
+    one("#statBalance").textContent = money(Math.abs(balance));
+    one("#weekState").textContent = state.closed ? "Cerrada" : "Abierta";
+    const statuses = ["Cortado", "En confección", "Terminado", "Entregado"];
+    one("#statusSummary").innerHTML = statuses
+      .map((status) => {
+        const count = state.works.filter((x) => x.status === status).length;
+        const percent = state.works.length
+          ? Math.round((count / state.works.length) * 100)
+          : 0;
+        return `<div class="status-row"><span>${status}</span><div class="track"><div class="fill" style="width:${percent}%"></div></div><b>${count}</b></div>`;
+      })
+      .join("");
+    one("#worksList").innerHTML = state.works.length
+      ? state.works
+          .map(
+            (x) =>
+              `<article class="record"><div><b>${escapeHtml(x.client)}</b><p>${escapeHtml(x.garment)} · ${escapeHtml(x.type)}</p><span class="pill">${escapeHtml(x.status)}</span><p>Registró: ${escapeHtml(x.createdBy)}</p></div><span class="amount">${money(x.value)}</span></article>`,
+          )
+          .join("")
+      : '<div class="empty">No hay vestidos registrados esta semana.</div>';
+    one("#paymentsList").innerHTML = state.payments.length
+      ? state.payments
+          .map(
+            (x) =>
+              `<article class="record"><div><b>${escapeHtml(x.date)} · ${escapeHtml(x.method)}</b><p>${escapeHtml(x.note || "Sin nota")}</p><p>Registró: ${escapeHtml(x.createdBy)}</p></div><span class="amount">${money(x.value)}</span></article>`,
+          )
+          .join("")
+      : '<div class="empty">No hay abonos esta semana.</div>';
+    one("#historyList").innerHTML = state.closes.length
+      ? state.closes
+          .map(
+            (x) =>
+              `<article class="record"><div><b>${escapeHtml(x.week)}</b><p>${x.count} vestidos · Cerró ${escapeHtml(x.closedBy)}</p></div><span class="amount">${money(x.balance)} saldo</span></article>`,
+          )
+          .join("")
+      : '<div class="empty">Aún no hay cierres.</div>';
+    one("#auditList").innerHTML = state.audit.length
+      ? state.audit
+          .map(
+            (x) =>
+              `<article class="record"><div><b>${escapeHtml(x.event)}</b><p>${escapeHtml(x.user)} · ${escapeHtml(x.detail)}</p></div><small>${new Date(x.at).toLocaleString("es-CO")}</small></article>`,
+          )
+          .join("")
+      : '<div class="empty">Sin actividad.</div>';
+    all("[data-open-work],[data-open-payment]").forEach((button) => {
+      button.disabled = state.closed;
+    });
+    one("#closeWeekButton").disabled = state.closed;
+  }
+  function enter(user) {
+    state.user = user;
+    localStorage.setItem("kvWorkshopSession", JSON.stringify(user));
+    one("#loginScreen").hidden = true;
+    one("#system").hidden = false;
+    one("#userRole").textContent =
+      `${user.name} · ${user.role === "admin" ? "Administradora" : "Taller"}`;
+    all("[data-admin]").forEach((item) => {
+      item.hidden = user.role !== "admin";
+    });
+    load().catch((error) => toast(error.message));
+  }
+  one("#loginForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = one("#loginButton");
+    button.disabled = true;
+    button.textContent = "Ingresando…";
+    one("#loginError").textContent = "";
+    try {
+      const username = one("#loginUser").value.trim().toLowerCase();
+      const user = USERS[username];
+      const hash = await sha256(one("#loginPassword").value);
+      if (!user || user.hash !== hash)
+        throw Error("Usuario o contraseña incorrectos");
+      enter({ username, role: user.role, name: user.name });
+    } catch (error) {
+      one("#loginError").textContent = error.message;
+    } finally {
+      button.disabled = false;
+      button.textContent = "Iniciar sesión";
+    }
+  });
+  one("#logoutButton").addEventListener("click", () => {
+    localStorage.removeItem("kvWorkshopSession");
+    location.reload();
+  });
+  all("nav button").forEach((button) =>
+    button.addEventListener("click", () => {
+      all("nav button,.page").forEach((item) =>
+        item.classList.remove("active"),
+      );
+      button.classList.add("active");
+      one(`#${button.dataset.page}`).classList.add("active");
     }),
-);
-$$('[data-open="work"]').forEach(
-  (b) => (b.onclick = () => $("#workDialog").showModal()),
-);
-$$('[data-open="payment"]').forEach(
-  (b) =>
-    (b.onclick = () => {
-      $("#paymentForm [name=fecha]").value = today();
-      $("#paymentDialog").showModal();
+  );
+  all("[data-open-work]").forEach((button) =>
+    button.addEventListener("click", () => one("#workDialog").showModal()),
+  );
+  all("[data-open-payment]").forEach((button) =>
+    button.addEventListener("click", () => {
+      one('#paymentForm [name="date"]').value = today();
+      one("#paymentDialog").showModal();
     }),
-);
-$$("[data-close]").forEach(
-  (b) => (b.onclick = () => $("#" + b.dataset.close).close()),
-);
-$("#weekPicker").value = state.week;
-$("#weekPicker").onchange = (e) => {
-  state.week = e.target.value;
-  load();
-};
-$("#saveWorkBtn").onclick = async () => {
-  const f = $("#workForm");
-  if (!f.reportValidity()) return;
-  const item = Object.fromEntries(new FormData(f));
-  item.week = state.week;
-  await api("saveWork", { item });
-  f.reset();
-  $("#workDialog").close();
-  toast("Trabajo registrado");
-  load();
-};
-$("#savePaymentBtn").onclick = async () => {
-  const f = $("#paymentForm");
-  if (!f.reportValidity()) return;
-  const item = Object.fromEntries(new FormData(f));
-  item.week = state.week;
-  await api("savePayment", { item });
-  f.reset();
-  $("#paymentDialog").close();
-  toast("Abono registrado");
-  load();
-};
-$("#closeWeek").onclick = async () => {
-  if (!confirm(`¿Cerrar ${state.week}? Después no se podrá modificar.`)) return;
-  await api("closeWeek", { week: state.week });
-  toast("Semana cerrada");
-  load();
-};
-(async () => {
+  );
+  all("[data-close]").forEach((button) =>
+    button.addEventListener("click", () =>
+      one(`#${button.dataset.close}`).close(),
+    ),
+  );
+  one("#workForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const item = Object.fromEntries(new FormData(event.currentTarget));
+    item.week = state.week;
+    item.createdBy = state.user.name;
+    await api("saveWork", { item });
+    event.currentTarget.reset();
+    one("#workDialog").close();
+    toast("Vestido registrado");
+    load();
+  });
+  one("#paymentForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const item = Object.fromEntries(new FormData(event.currentTarget));
+    item.week = state.week;
+    item.createdBy = state.user.name;
+    await api("savePayment", { item });
+    event.currentTarget.reset();
+    one("#paymentDialog").close();
+    toast("Abono registrado");
+    load();
+  });
+  one("#closeWeekButton").addEventListener("click", async () => {
+    if (!confirm(`¿Cerrar ${state.week}? Después no se podrá modificar.`))
+      return;
+    await api("closeWeek", { week: state.week });
+    toast("Semana cerrada");
+    load();
+  });
+  one("#weekInput").value = state.week;
+  one("#weekInput").addEventListener("change", (event) => {
+    state.week = event.target.value;
+    load();
+  });
   try {
-    enter(await api("session"));
-  } catch {}
+    const session = JSON.parse(localStorage.getItem("kvWorkshopSession"));
+    if (session?.username && USERS[session.username]) enter(session);
+  } catch {
+    localStorage.removeItem("kvWorkshopSession");
+  }
 })();
