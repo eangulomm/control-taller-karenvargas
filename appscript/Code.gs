@@ -6,7 +6,6 @@ const CFG = {
     audit: "Auditoria",
   },
   sessionHours: 720,
-  challengeMinutes: 5,
 };
 const HEAD = {
   Trabajos: [
@@ -97,7 +96,7 @@ function cambiarContrasenaTaller(nueva) {
 }
 
 function route_(a, p) {
-  if (a === "challenge") return challenge_(p);
+  if (a === "authInfo") return authInfo_(p);
   if (a === "login") return login_(p);
   const s = session_(p.token);
   if (a === "session") return publicUser_(s);
@@ -119,25 +118,14 @@ function user_(username) {
   );
   return raw ? JSON.parse(raw) : null;
 }
-function challenge_(p) {
+function authInfo_(p) {
   const u = user_(p.username);
   if (!u || !u.active) throw Error("Usuario no autorizado");
-  const nonce = Utilities.getUuid().replace(/-/g, "");
-  CacheService.getScriptCache().put(
-    "CH_" + nonce,
-    u.username,
-    CFG.challengeMinutes * 60,
-  );
-  return { salt: u.salt, nonce: nonce };
+  return { salt: u.salt };
 }
 function login_(p) {
-  const u = user_(p.username),
-    cache = CacheService.getScriptCache(),
-    challengeUser = cache.get("CH_" + String(p.nonce || ""));
-  if (!u || !challengeUser || challengeUser !== u.username)
-    throw Error("Solicitud de acceso vencida");
-  cache.remove("CH_" + p.nonce);
-  if (hash_(u.verifier + p.nonce) !== p.proof)
+  const u = user_(p.username);
+  if (!u || !u.active || u.verifier !== String(p.verifier || ""))
     throw Error("Usuario o contraseña incorrectos");
   const token =
     Utilities.getUuid().replace(/-/g, "") +
