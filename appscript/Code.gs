@@ -75,13 +75,11 @@ function setup() {
   );
 }
 function setUser_(username, password, role, name) {
-  const salt = Utilities.getUuid().replace(/-/g, "");
   PropertiesService.getScriptProperties().setProperty(
     "USER_" + username.toLowerCase(),
     JSON.stringify({
       username: username.toLowerCase(),
-      salt: salt,
-      verifier: hash_(salt + password),
+      passwordHash: hash_(password),
       role: role,
       name: name,
       active: true,
@@ -96,7 +94,6 @@ function cambiarContrasenaTaller(nueva) {
 }
 
 function route_(a, p) {
-  if (a === "authInfo") return authInfo_(p);
   if (a === "login") return login_(p);
   const s = session_(p.token);
   if (a === "session") return publicUser_(s);
@@ -118,14 +115,9 @@ function user_(username) {
   );
   return raw ? JSON.parse(raw) : null;
 }
-function authInfo_(p) {
-  const u = user_(p.username);
-  if (!u || !u.active) throw Error("Usuario no autorizado");
-  return { salt: u.salt };
-}
 function login_(p) {
   const u = user_(p.username);
-  if (!u || !u.active || u.verifier !== String(p.verifier || ""))
+  if (!u || !u.active || u.passwordHash !== String(p.passwordHash || ""))
     throw Error("Usuario o contraseña incorrectos");
   const token =
     Utilities.getUuid().replace(/-/g, "") +

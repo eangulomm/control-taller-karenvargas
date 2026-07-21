@@ -18,8 +18,8 @@ El proyecto inicia en modo demostración. Usuarios: `karen` y `taller`; contrase
 1. Crear una hoja de cálculo nueva.
 2. Abrir **Extensiones → Apps Script** y reemplazar `Code.gs` con `appscript/Code.gs`.
 3. Ejecutar `setup()` una vez y autorizar.
-4. Ejecutar `cambiarContrasenaKaren('...')` y `cambiarContrasenaTaller('...')` con contraseñas privadas.
+4. Antes de ejecutar `setup()`, reemplazar temporalmente las dos contraseñas `CAMBIAR-CONTRASENA-...` dentro de esa función por las contraseñas privadas. Ejecutar `setup()` una vez y luego retirar las contraseñas visibles del editor.
 5. Desplegar como aplicación web: ejecutar como propietario y acceso para cualquier usuario.
 6. Copiar la URL `/exec` en `config.js` y cambiar `DEMO_MODE` a `false`.
 
-La autenticación usa desafío SHA-256: la contraseña no se guarda en texto plano ni se incluye en la URL. Las sesiones vencen después de 30 días.
+La autenticación guarda únicamente una huella SHA-256 en las propiedades privadas del Apps Script. La contraseña no se almacena en texto plano. Las sesiones vencen después de 30 días.

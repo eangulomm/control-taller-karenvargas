@@ -70,12 +70,11 @@ function jsonp(payload) {
   });
 }
 async function loginReal(data) {
-  const info = await jsonp({ action: "authInfo", username: data.username });
-  const verifier = await sha(info.salt + data.password);
+  const passwordHash = await sha(data.password);
   const out = await jsonp({
     action: "login",
     username: data.username,
-    verifier,
+    passwordHash,
   });
   localStorage.tallerToken = out.token;
   return out.user;
