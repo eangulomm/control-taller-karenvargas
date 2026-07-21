@@ -1,5 +1,523 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#371f2d" />
+    <title>Control de Taller | Karen Vargas</title>
+    <style>
+:root {
+  --ink: #251a20;
+  --wine: #5b3046;
+  --rose: #a9627c;
+  --cream: #fbf7f2;
+  --line: #e8ddd5;
+  --ok: #37745b;
+  --warn: #b47a29;
+  --bad: #a33f46;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font:
+    15px/1.45 system-ui,
+    -apple-system,
+    Segoe UI,
+    sans-serif;
+  color: var(--ink);
+  background: var(--cream);
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+  border: 0;
+}
+button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(circle at top, #ead7dd, var(--cream) 55%);
+}
+.card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 22px;
+  box-shadow: 0 10px 30px #3b1f2d0d;
+}
+.login-card {
+  width: min(420px, 100%);
+}
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+h1 {
+  font-family: Georgia, serif;
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--rose);
+  font-weight: 800;
+  margin-bottom: 5px;
+}
+.muted {
+  color: #756a70;
+}
+.error {
+  color: var(--bad);
+  min-height: 22px;
+}
+label {
+  display: grid;
+  gap: 6px;
+  font-weight: 650;
+  margin: 14px 0;
+}
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 12px;
+  background: #fff;
+  color: var(--ink);
+}
+.primary,
+.secondary,
+.danger,
+.ghost {
+  border-radius: 11px;
+  padding: 12px 16px;
+  font-weight: 750;
+}
+.primary {
+  background: var(--wine);
+  color: #fff;
+}
+.secondary {
+  background: #eadbe1;
+  color: var(--wine);
+}
+.danger {
+  background: #f8e1e2;
+  color: var(--bad);
+}
+.ghost {
+  background: #fff;
+  border: 1px solid var(--line);
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px clamp(18px, 5vw, 70px);
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+}
+header h1 {
+  margin: 0;
+  font-size: 25px;
+}
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.badge {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eee3e7;
+  color: var(--wine);
+  font-size: 12px;
+  font-weight: 750;
+}
+nav {
+  display: flex;
+  gap: 5px;
+  padding: 10px clamp(12px, 5vw, 70px);
+  background: #fff;
+  overflow: auto;
+  border-bottom: 1px solid var(--line);
+}
+nav button {
+  background: transparent;
+  padding: 10px 14px;
+  border-radius: 9px;
+  white-space: nowrap;
+}
+nav button.active {
+  background: var(--wine);
+  color: #fff;
+}
+main {
+  max-width: 1180px;
+  margin: auto;
+  padding: 26px 18px 60px;
+}
+.view {
+  display: none;
+}
+.view.active {
+  display: block;
+}
+.toolbar,
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+}
+.toolbar input {
+  width: auto;
+}
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin: 20px 0;
+}
+.metrics article {
+  background: #fff;
+  border: 1px solid var(--line);
+  padding: 20px;
+  border-radius: 16px;
+}
+.metrics span {
+  display: block;
+  color: #756a70;
+}
+.metrics strong {
+  font-size: 26px;
+}
+.quick {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 20px 0;
+}
+.list {
+  display: grid;
+  gap: 10px;
+}
+.row {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 15px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+.row p {
+  margin: 2px 0;
+}
+.money {
+  font-weight: 800;
+  font-size: 18px;
+}
+.empty {
+  text-align: center;
+  padding: 45px;
+  color: #756a70;
+}
+.bar {
+  display: grid;
+  grid-template-columns: 100px 1fr 35px;
+  align-items: center;
+  gap: 10px;
+  margin: 13px 0;
+}
+.track {
+  height: 9px;
+  background: #eee;
+  border-radius: 9px;
+  overflow: hidden;
+}
+.fill {
+  height: 100%;
+  background: var(--rose);
+}
+dialog {
+  border: 0;
+  border-radius: 18px;
+  padding: 0;
+  width: min(560px, calc(100% - 24px));
+  box-shadow: 0 30px 90px #0004;
+}
+dialog::backdrop {
+  background: #251a2088;
+}
+dialog form {
+  padding: 24px;
+}
+.icon {
+  background: transparent;
+  font-size: 25px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+#toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #fff;
+  border-radius: 10px;
+  padding: 11px 17px;
+  opacity: 0;
+  pointer-events: none;
+  transition: 0.2s;
+}
+#toast.show {
+  opacity: 1;
+}
+@media (max-width: 720px) {
+  header {
+    align-items: flex-start;
+  }
+  .header-actions {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+  .metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+  .metrics strong {
+    font-size: 21px;
+  }
+  .toolbar {
+    align-items: flex-start;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .row {
+    grid-template-columns: 1fr;
+  }
+  .quick > * {
+    flex: 1;
+  }
+  .badge#userBadge {
+    display: none;
+  }
+}
+@media (max-width: 390px) {
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+</style>
+  </head>
+  <body>
+    <section id="login" class="login-shell">
+      <form id="loginForm" class="card login-card">
+        <p class="eyebrow">ATELIER KAREN VARGAS</p>
+        <h1>Control de taller</h1>
+        <p class="muted">Producción, abonos y cuentas semanales.</p>
+        <label
+          >Usuario<input id="username" autocomplete="username" required
+        /></label>
+        <label
+          >Contraseña<input
+            id="password"
+            type="password"
+            autocomplete="current-password"
+            required
+        /></label>
+        <button class="primary" type="submit">Iniciar sesión</button>
+        <p id="loginError" class="error"></p>
+      </form>
+    </section>
+
+    <div id="app" hidden>
+      <header>
+        <div>
+          <p class="eyebrow">ATELIER KAREN VARGAS</p>
+          <h1>Control de taller</h1>
+        </div>
+        <div class="header-actions">
+          <span id="userBadge" class="badge"></span
+          ><button id="logoutBtn" class="ghost">Cerrar sesión</button>
+        </div>
+      </header>
+      <nav>
+        <button data-view="dashboard" class="active">Resumen</button>
+        <button data-view="trabajos">Trabajos</button>
+        <button data-view="abonos">Abonos</button>
+        <button data-view="cierres">Historial</button>
+        <button data-view="auditoria" data-admin>Auditoría</button>
+      </nav>
+      <main>
+        <section id="dashboard" class="view active">
+          <div class="toolbar">
+            <div>
+              <p class="eyebrow">SEMANA</p>
+              <h2 id="weekTitle"></h2>
+            </div>
+            <input id="weekPicker" type="week" />
+          </div>
+          <div class="metrics">
+            <article>
+              <span>Prendas</span><strong id="mCount">0</strong>
+            </article>
+            <article>
+              <span>Producido</span><strong id="mProduced">$0</strong>
+            </article>
+            <article>
+              <span>Abonado</span><strong id="mPaid">$0</strong>
+            </article>
+            <article>
+              <span id="balanceLabel">Saldo pendiente</span
+              ><strong id="mBalance">$0</strong>
+            </article>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <h3>Estado de producción</h3>
+              <span id="weekStatus" class="badge"></span>
+            </div>
+            <div id="statusBars"></div>
+          </div>
+          <div class="quick">
+            <button data-open="work" class="primary">+ Registrar trabajo</button
+            ><button data-open="payment" class="secondary" data-admin>
+              + Registrar abono</button
+            ><button id="closeWeek" class="danger" data-admin>
+              Cerrar semana
+            </button>
+          </div>
+        </section>
+
+        <section id="trabajos" class="view">
+          <div class="toolbar">
+            <h2>Trabajos de la semana</h2>
+            <button data-open="work" class="primary">+ Nuevo</button>
+          </div>
+          <div id="workList" class="list"></div>
+        </section>
+        <section id="abonos" class="view">
+          <div class="toolbar">
+            <h2>Abonos</h2>
+            <button data-open="payment" class="primary" data-admin>
+              + Registrar
+            </button>
+          </div>
+          <div id="paymentList" class="list"></div>
+        </section>
+        <section id="cierres" class="view">
+          <div class="toolbar"><h2>Semanas cerradas</h2></div>
+          <div id="closeList" class="list"></div>
+        </section>
+        <section id="auditoria" class="view">
+          <div class="toolbar"><h2>Registro de actividad</h2></div>
+          <div id="auditList" class="list"></div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="workDialog">
+      <form id="workForm">
+        <div class="card-head">
+          <h2>Registrar trabajo</h2>
+          <button type="button" data-close="workDialog" class="icon">×</button>
+        </div>
+        <input name="id" type="hidden" /><label
+          >Clienta<input name="clienta" required /></label
+        ><label
+          >Prenda o descripción<input
+            name="prenda"
+            required
+            placeholder="Vestido largo, conjunto..."
+        /></label>
+        <div class="grid">
+          <label
+            >Trabajo<select name="tipo">
+              <option>Corte y confección</option>
+              <option>Corte</option>
+              <option>Confección</option>
+              <option>Arreglo</option>
+            </select></label
+          ><label
+            >Estado<select name="estado">
+              <option>Pendiente</option>
+              <option>En proceso</option>
+              <option>Terminado</option>
+              <option>Entregado</option>
+            </select></label
+          >
+        </div>
+        <label
+          >Valor acordado<input
+            name="valor"
+            type="number"
+            min="0"
+            step="1000"
+            required /></label
+        ><label>Nota<textarea name="nota" rows="3"></textarea></label
+        ><button id="saveWorkBtn" type="button" class="primary">
+          Guardar trabajo
+        </button>
+      </form>
+    </dialog>
+    <dialog id="paymentDialog">
+      <form id="paymentForm">
+        <div class="card-head">
+          <h2>Registrar abono</h2>
+          <button type="button" data-close="paymentDialog" class="icon">
+            ×
+          </button>
+        </div>
+        <label>Fecha<input name="fecha" type="date" required /></label
+        ><label
+          >Valor entregado<input
+            name="valor"
+            type="number"
+            min="1"
+            step="1000"
+            required /></label
+        ><label
+          >Medio<select name="medio">
+            <option>Transferencia</option>
+            <option>Efectivo</option>
+            <option>Otro</option>
+          </select></label
+        ><label>Nota o comprobante<input name="nota" /></label
+        ><button id="savePaymentBtn" type="button" class="primary">
+          Guardar abono
+        </button>
+      </form>
+    </dialog>
+    <div id="toast"></div>
+    <script>window.APP_CONFIG={API_URL:"",DEMO_MODE:false};</script>
+<script>
 const $ = (s) => document.querySelector(s),
-  $$ = (s) => [...document.querySelectorAll(s)];
+  $ = (s) => [...document.querySelectorAll(s)];
 const money = (n) =>
   new Intl.NumberFormat("es-CO", {
     style: "currency",
@@ -279,7 +797,7 @@ function render() {
           `<article class="row"><div><b>${esc(x.event)}</b><p>${esc(x.user)} · ${esc(x.detail)}</p></div><small>${new Date(x.at).toLocaleString("es-CO")}</small></article>`,
       )
       .join("") || '<div class="empty">Sin actividad.</div>';
-  $$("[data-open]").forEach((b) => (b.disabled = state.closed));
+  $("[data-open]").forEach((b) => (b.disabled = state.closed));
   $("#closeWeek").disabled = state.closed;
 }
 const esc = (s) =>
@@ -296,7 +814,7 @@ function enter(u) {
   $("#app").hidden = false;
   $("#userBadge").textContent =
     `${u.name} · ${u.role === "admin" ? "Administradora" : "Taller"}`;
-  $$("[data-admin]").forEach((x) => (x.hidden = u.role !== "admin"));
+  $("[data-admin]").forEach((x) => (x.hidden = u.role !== "admin"));
   load();
 }
 $("#loginForm").addEventListener("submit", async (e) => {
@@ -325,25 +843,25 @@ $("#logoutBtn").onclick = async () => {
   await api("logout");
   location.reload();
 };
-$$("nav button").forEach(
+$("nav button").forEach(
   (b) =>
     (b.onclick = () => {
-      $$("nav button,.view").forEach((x) => x.classList.remove("active"));
+      $("nav button,.view").forEach((x) => x.classList.remove("active"));
       b.classList.add("active");
       $("#" + b.dataset.view).classList.add("active");
     }),
 );
-$$('[data-open="work"]').forEach(
+$('[data-open="work"]').forEach(
   (b) => (b.onclick = () => $("#workDialog").showModal()),
 );
-$$('[data-open="payment"]').forEach(
+$('[data-open="payment"]').forEach(
   (b) =>
     (b.onclick = () => {
       $("#paymentForm [name=fecha]").value = today();
       $("#paymentDialog").showModal();
     }),
 );
-$$("[data-close]").forEach(
+$("[data-close]").forEach(
   (b) => (b.onclick = () => $("#" + b.dataset.close).close()),
 );
 $("#weekPicker").value = state.week;
@@ -384,3 +902,7 @@ $("#closeWeek").onclick = async () => {
     enter(await api("session"));
   } catch {}
 })();
+
+</script>
+  </body>
+</html>
